@@ -11,6 +11,8 @@
 """
 
 import socket, struct , time ,os , math , numpy
+from gg_conv import Conveyor
+import threading
 
 
 v_x = 0
@@ -21,7 +23,6 @@ robot_port      = 30003              ####RTDE
 gripper_port    = 63352
 vs_ip           = '10.10.1.10'
 vs_port         = 2024
-
 
 joint_speed = 0.1
 
@@ -75,43 +76,14 @@ def grip_control(c):
                 g.send(b'SET POS 0\n')
         elif c == 255 :
                 g.send(b'SET POS 255\n')
-        # g.send(b'SET POS 255\n')
-        # time.sleep(1)
-        # g.send(b'SET POS 0\n')
-        # time.sleep(1)
-        # g.send(b'SET POS 255\n')
-        # time.sleep(1)
         g_recv = str(g.recv(10), 'UTF-8')
         g.send(b'GET POS \n')
         g_recv = str(g.recv(10), 'UTF-8')
         print ('Gripper Pos =    ' + g_recv)
-
-        
-
-        
-def robot_moveTCPmode(x,y,rz) :
-
-        global moveX, moveY, moveZ, moveRx, moveRy, moveRz
-        print('Robot start moveing')
-
-        moveX  = x /100 
-        moveY  = y /100
-        moveZ  = 0 
-        moveRx = 0 
-        moveRy = 0 
-        #moveRz = rz / 1000
-        moveRz = 0
-        
-        cmd_move = str.encode('movel(pose_add(get_actual_tcp_pose(),p['+str(moveX)+','+str(moveY)+','+str(moveZ)+','+str(moveRx)+','+str(moveRy)+','+str(moveRz)+'],0.5,0.5,0,0)\n')
-        print (cmd_move)
-        print (type(cmd_move))
-        r.send(cmd_move)
-        time.sleep(1)
  
 
 def robot_home() :
         ##vs ref pos
-
         print('Robot start moveing')
         moveX  = 0.06583
         moveY  = -0.31616
@@ -126,35 +98,11 @@ def robot_home() :
         r.send(cmd_move)
         time.sleep(1)
 
-def robot_moveTCPmode(x,y,rz, mode=0) :
-
-        global moveX, moveY, moveZ, moveRx, moveRy, moveRz
-        print('Robot starts moving')
-
-        moveX  = x /100 + 0.056
-        moveY  = - 0.331 # y /100 - 0.331
-        if mode == 0:
-            moveZ  = 0 + 0.12
-        elif mode == 1:
-            moveZ = - 0.23 + 0.12 # -0.235
-        elif mode == 2:
-            moveZ = - 0.1 + 0.12
-        moveRx = 0 + 2.233
-        moveRy = 0 + 2.257
-        #moveRz = rz / 1000
-        moveRz = 0 - 0.039
-       
-        cmd_move = str.encode('movel(pose_add(get_actual_tcp_pose(),p['+str(moveX)+','+str(moveY)+','+str(moveZ)+','+str(moveRx)+','+str(moveRy)+','+str(moveRz)+'],0.5,0.5,0,0)\n')
-        #cmd_move = str.encode('movel(p['+str(moveX)+','+str(moveY)+','+str(moveZ)+','+str(moveRx)+','+str(moveRy)+','+str(moveRz)+'],0.5,0.5,0,0)\n')
-        print (cmd_move)
-        print (type(cmd_move))
-        r.send(cmd_move)
-        time.sleep(1)
-
 def gripper_move(x,y,rz, mode=0):
         
         global moveX, moveY, moveZ, moveRx, moveRy, moveRz
 
+        #Home values
         moveX  = 0.06583
         moveY  = -0.31616
         moveZ  = 0.01625
@@ -162,32 +110,25 @@ def gripper_move(x,y,rz, mode=0):
         moveRy = 2.238
         moveRz = 0
 
+        #Camera offset
+        cameraY=(y*0.79-20.54)/1000 #mm
+        cameraX=(x*0.8936-11.6168)/1000 #mm
 
-        # moveX  = x /1000 + 0.06583
-        # moveY  = - 0.31616 # y /100 - 0.331
-
-        # if mode == 0:
-        #         moveZ  = 0 + 0.12
-        # elif mode == 1:
-        #         moveZ = - 0.23 + 0.12 # -0.235
-        # elif mode == 2:
-        #         moveZ = - 0.1 + 0.12
-        # moveRx = 0 + 2.233
-        # moveRy = 0 + 2.257
-        # #moveRz = rz / 1000
-        # # moveRz = 0 - 0.039
+        #Robot offsets
+        offsetZ= - 0.250
+        offsetX= 0.250
         if mode == 0:
-               moveZ = (- 0.187)
-               moveX = 0.253
+               moveZ = offsetZ+0.066
+               moveX = offsetX+cameraX
+               moveY+=cameraY
         elif mode == 1:
-               moveZ = (- 0.250)
-               moveX = 0.253
+               moveZ = offsetZ
+               moveX = offsetX+cameraX
+               moveY+=cameraY
         elif mode == 2:
-               moveZ = (- 0.250)
+               moveZ = offsetZ
 
         cmd_move = str.encode('movel(p['+str(moveX)+','+str(moveY)+','+str(moveZ)+','+str(moveRx)+','+str(moveRy)+','+str(moveRz)+'],0.5,0.5,0,0)\n')
-        print (cmd_move)
-        print (type(cmd_move))
         r.send(cmd_move)
         time.sleep(1)
         return
@@ -195,133 +136,89 @@ def gripper_move(x,y,rz, mode=0):
 
 def vs_recv():
 
+        detect_status=0
+        angle_status=0
         v_x = 0
         v_y = 0
         v_rz = 0
         
         v_data = ''
-        v_coor = [0,0,0]
+        v_coor = [0,0,0,0,0]
               
         
-        while  v_coor == [0,0,0] :
+        while  v_coor == [0,0,0,0,0] :
                 while v_data == '':
-                        
-                        print ('send start to cvs')
                         v.send (b'start!')
-                        v_data = v.recv(20)
+                        v_data = v.recv(64)
                
                 coor_str = str(v_data, 'UTF-8')
-                print ('str v_data =   ' + coor_str)
                 a = coor_str.split("[")
                 b = a[1].split("]")
                 coor_int = (b[0].split(","))
-                print(coor_int)
-                status= int(coor_int[0])
-                v_x    = float(coor_int[1])
-                offset = float(coor_int[2])
-                v_y    = offset
-                v_rz   = float(coor_int[3])
+                detect_status=int(coor_int[0])
+                angle_status=int(coor_int[1])
+                if(detect_status==1):
+                        v_x    = float(coor_int[3])
+                        offset = float(coor_int[2])
+                        v_y    = offset
+                if(angle_status==1):
+                        v_rz   = float(coor_int[4])
 
-                print ('v_x =  ' + str(v_x))
-                print ('v_y =  ' + str(v_y))
-                print ('v_rz =  ' + str(v_rz))
-
-                v_coor = [status,v_x,v_y,v_rz]
+                v_coor = [detect_status,angle_status,v_x,v_y,v_rz]
                 print ('v_coor  ======   ' + str(v_coor))
-                # if math.isnan(v_coor[0]) or math.isnan(v_coor[1]) :
-                #         print ('v_coor == nan')
-                #         v_data = ''
-                #         v_coor = [0,0,0]
+                v_data = ''
 
         return v_coor
-              
-def main():
+
+def conveyor_task():
+    conveyor = Conveyor()
+    conveyor.conveyor_control()
+
+def Initialize():
         robot_connection()
         gripper_connection()
         #conv_connection()
         vs_connection()
-        grip_control(0)
-        #convey()
-        v_x = 0
-        v_y = 0
-        v_rz = 0   
-        delay = 0.5  
-
+        #convey start
         robot_home()
-        time.sleep(delay)
-        #status,v_x, v_y, v_rz = vs_recv() # cm, cm, deg     
+        # Start conveyor as a thread
+        conveyor_thread = threading.Thread(target=conveyor_task)
+        conveyor_thread.start()
 
-        #print(v_x, v_y, v_rz)
+def activating():
+        while True:
+                v_x = 0
+                v_y = 0
+                v_rz = 0  
+                status_detect=0
+                status_angle=0 
+                delay = 0.5  
 
-        # gripper_move(x=v_x, y=v_y, rz=0, mode=0) # Move gripper to top of box
-        # time.sleep(delay)
-        # gripper_move(x=v_x, y=v_y, rz=0, mode=1) # Move gripper down
-        # time.sleep(delay)
-        # grip_control(255)
-        # time.sleep(delay)
-        # robot_home()
-        # time.sleep(delay)
-        # gripper_move(x=v_x, y=v_y, rz=0, mode=2)
-        # time.sleep(delay)
-        # grip_control(0)
-        # time.sleep(delay)
-        # robot_home()
-        # time.sleep(delay)
-        # gripper_move(x=v_x, y=v_y, rz=0, mode=1) # Move gripper down
-        # time.sleep(delay)
-        # grip_control(0)
-        # time.sleep(delay)
-        # robot_home()
+                time.sleep(delay)
+                print("Waiting for object detection")
+                while(status_detect!=1 or status_angle!=1):
+                 status_detect,status_angle,v_x, v_y, v_rz = vs_recv()  
 
+                print(v_x, v_y, v_rz)
 
+                gripper_move(x=v_x, y=v_y, rz=0, mode=0) # Move gripper to top of box
+                time.sleep(delay)
+                gripper_move(x=v_x, y=v_y, rz=0, mode=1) # Move gripper down
+                time.sleep(delay)
+                grip_control(255)
+                time.sleep(delay)
+                robot_home()
+                time.sleep(delay)
+                gripper_move(x=v_x, y=v_y, rz=0, mode=2)
+                time.sleep(delay)
+                grip_control(0)
+                time.sleep(delay)
+                robot_home()
 
-        #r.send(b'movel(p[-0.1176,-0.2903,0.00,3.141,-0.037,0],0.5,0.5,0,0)\n')
-        # while 0 :
-                
-        #         xx = input('x =>   ' )
-        #         if xx == '1' :
-                        
-        #                 xint = float(xx)
-        #                 cmd = str.encode('movel(pose_add(get_actual_tcp_pose(),p['+str(xint)+',0,0,0,0,0]),1,0.25,0,0)\n')
-        #                 #cmd_move = str.encode(cmd)
-        #                 r.send(cmd)
-
-        #         elif xx == '2' :
-        #                 cnt_pick = 0
-        #                 while 1 :
-        #                         r_offset = vs_recv()
-        #                         print ('r_offset  =  ' + str(r_offset))
-                                
-        #                         if  1:
-        #                                 print ('robot moving')
-        #                                 x_m = -r_offset[1]/10000
-        #                                 offset = r_offset[0]/10000
-        #                                 y_m    = -offset
-        #                                 z_rad = '{:0.2f}'.format(r_offset[2]*0.01745)
-        #                                 #cmd = str.encode('movel(pose_add(get_actual_tcp_pose(),p['+ str(x_m) +','+ str(y_m)+',0,0,0,'+str(z_rad)+']),1,0.5,0,0)\n')
-        #                                 cmd = str.encode('movel(pose_add(get_actual_tcp_pose(),p['+ str(x_m) +','+ str(y_m)+',0,0,0,0]),1,0.8,0,0)\n')
-        #                                 print (str(cmd))
-        #                                 r.send(cmd)
-
-        #                         if x_m < 0.003 and x_m > -0.003 and y_m <0.003 and y_m > -0.003  :
-        #                                 cnt_pick += 1
-        #                         else :
-        #                                 cnt_pick = 0
-        #                         if cnt_pick == 5 :
-        #                                 print ('robot start picking')
-                                        
-        #                                 cmd = str.encode('movel(pose_add(get_actual_tcp_pose(),p['+ str(x_m) +','+ str(y_m)+',0,0,0,0]),1,0.8,0,0)\n')
-        #                                 print (str(cmd))
-        #                                 r.send(cmd)
-                                        
-                                 
-
-                
-        # while 0:
-        #         r.send(b'movel(pose_add(get_actual_tcp_pose(),p[-0.05,0,0,0,0,0]),1,0.25,0,0)\n')
-        #cmd = str.encode('movel(pose_add(get_actual_tcp_pose(),p['+ str(v_list[0]/100) +','+ str(v_list[1]/100)+',-0.1,0,0,0]),1,0.25,0,0)\n')
-        #print (str(cmd))
-        #r.send(cmd)
+              
+def main():
+        Initialize()
+        activating()
 
         
 

@@ -8,89 +8,67 @@
 #### stop conveyor       = jog_stop,conv,0
 #########################################################
 
-
-
-
-import socket,time
+import time
 from socket import *
-
 
 host    = '10.10.0.98'
 port_conv = 2002
 
-c = socket(AF_INET, SOCK_STREAM)
-#c.bind(('10.10.0.98', 2002))
+convey_speed=40
+convey_duration=20
 
 
+class Conveyor:
+    def __init__(self) -> None:
+        # nesseary parameters
+        self.addr = (host, port_conv)
+        self.speed = convey_speed
+        self.duration = convey_duration
 
-#c = socket.socket()
+        self.convey_socket_connection()
 
-#with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as c:
-c.bind((host , port_conv))
-print ("socket binded to %s" %(port_conv)) 
+    def convey_socket_connection(self):
 
-c.listen(1)
-print ("socket is listening") 
-conv, addr = c.accept()
-with conv:
-    print(f"Connected by {addr}")
-    conv.sendall(b'activate,tcp,0.0\n')
-    time.sleep(1)
+        # Start a server to allow connection from conveyor
+        self.c = socket(AF_INET, SOCK_STREAM)
+        self.c.bind(self.addr)
+        print ("socket binded to %s" %(self.addr[1]))
+        
+        # Listen 1 connection
+        self.c.listen(1)
+        print("Waiting for connection...")
+        self.cong, self.client_addr = self.c.accept()
 
-    conv.sendall(b'pwr_on,conv,0\n')
-    time.sleep(1)
+        print(f"Connected by {self.client_addr}")
+        self.cong.sendall(b'activate,tcp,0.0\n')
+        self.cong.sendall(b'pwr_on,conv,0\n')
 
-    conv.sendall(b'set_vel,conv,20\n')
-    time.sleep(1)
+    def conveyor_control(self):
+        '''
+        Control the conveyor with speed (mm/s) and duration (s)
+        '''
+        speed = self.speed
+        duration = self.duration
+        command_speed=f"set_vel,conv,{speed}".encode('utf-8')
+        self.cong.sendall(command_speed)
+        print(f"conveyor speed is {speed} mm/s")
+        time.sleep(0.5)
 
-    conv.sendall(b'jog_stop,conv,0\n')
-    time.sleep(1)
+        print(f"Moving conveyor forward for {duration} seconds")
+        self.cong.send(b'jog_fwd,conv,0\n')
+        time.sleep(duration)
 
-    conv_recv = conv.recv(100)
-    print(conv_recv)
-  
-# print ('0000000000000000')
-# cmd = input('cmd to conv:\n')
-# print(f'You entered {cmd}')
-cmd = "activate,tcp,0.0\n"
-c.send(b'activate,tcp,0.0\n')
-#c.sendall(cmd.encode())
-#conv.sendall(cmd.encode())
-time.sleep(1)
+        # Stop conveyor
+        self.cong.send(b'jog_stop,conv,0\n')
+        time.sleep(0.5)
+        print(f"Conveyor response: {self.cong.recv(100)}")
 
-conv.sendall(b'pwr_on,conv,0\n')
-# time.sleep(1)
+    def terminate(self):
+        self.cong.send(b'pwr_off,conv,0\n')
+        self.cong.close()
+        self.server_fd.close()
+            
 
-# conv.sendall(b'set_vel,conv,10\n')
-# time.sleep(1)
-
-# conv.sendall(b'jog_fwd,conv,0\n')
-# time.sleep(1)
-
-conv_recv = conv.recv(10)
-print (conv_recv)
-"""
-# print ('0000000000000000')
-# cmd = input('cmd to conv:\n')
-# print(f'You entered {cmd}')
-cmd = "activate,tcp,0.0\n"
-c.send(b'activate,tcp,0.0\n')
-#c.sendall(cmd.encode())
-#conv.sendall(cmd.encode())
-time.sleep(1)
-
-conv.sendall(b'pwr_on,conv,0\n')
-# time.sleep(1)
-
-# conv.sendall(b'set_vel,conv,10\n')
-# time.sleep(1)
-
-# conv.sendall(b'jog_fwd,conv,0\n')
-# time.sleep(1)
-
-conv_recv = conv.recv(10)
-print (conv_recv)
-"""
-   
-
-
+if __name__ == "__main__":
+    conveyor = Conveyor()
+    conveyor.conveyor_control()
