@@ -81,12 +81,13 @@ class Main:
             status_angle = 0
             delay = 0.3
 
-            time.sleep(0.3)
+            time.sleep(delay)
             print("Waiting for object detection")
             while (status_detect!=1 or status_angle!=1):
                  status_detect,status_angle,v_x, v_y, v_rz = self.vs_recv() 
 
             print(v_x, v_y, v_rz)
+            
             self.robot.move(x=v_x, y=v_y, rz=0, mode=0) # Move gripper to top of box
             time.sleep(delay)
             self.robot.move(x=v_x, y=v_y, rz=0, mode=1) # Move gripper down
@@ -100,6 +101,8 @@ class Main:
             # self.gripper.control(0)
             # time.sleep(0.3)
             # self.robot.home()
+
+            status_detect,status_angle,v_x, v_y, v_rz = self.vs_recv()     
 
 def main():
     controller = Main()

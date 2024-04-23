@@ -1,15 +1,3 @@
-#!/usr/bin/env python
-# encoding: utf=8
-
-""" 
-#UR Controller Primary Client Interface Reader
-# For software version 3.0
-#
-# Overview of client interface      : https://www.universal-robots.com/articles/ur/interface-communication/overview-of-client-interfaces/
-# Datastream info found             : https://www.universal-robots.com/articles/ur/interface-communication/remote-control-via-tcpip/
-# Script command for control robot  : https://s3-eu-west-1.amazonaws.com/ur-support-site/124999/scriptManual_3.15.4.pdf
-"""
-
 import socket, struct , time ,os , math , numpy
 from gg_conv import Conveyor
 import threading
@@ -26,6 +14,7 @@ vs_port         = 2024
 
 joint_speed = 0.1
 
+# gg_robot.py
 def robot_connection() :
 
         global r
@@ -40,7 +29,7 @@ def robot_connection() :
         else :
                 print('Connected to Robot RTDE...FAILED!')
 
-
+# gg_gripper.py
 def gripper_connection() :
    global g
    #Socket communication
@@ -59,7 +48,7 @@ def gripper_connection() :
       g.send(b'SET FOR 255\n')
       print ('Gripper Activated')
 
-
+# main.py
 def vs_connection():
 
         ####Establish connection to vision system
@@ -70,7 +59,7 @@ def vs_connection():
                 print ('Connected to Vision system ....SUCCESSFULLY!')
         v_data = ''
 
-
+# gg_gripper.py
 def grip_control(c):
         if c == 0 :
                 g.send(b'SET POS 0\n')
@@ -81,13 +70,14 @@ def grip_control(c):
         g_recv = str(g.recv(10), 'UTF-8')
         print ('Gripper Pos =    ' + g_recv)
  
-
+# gg_robot.py
 def robot_home() :
         ##vs ref pos
         print('Robot start moveing')
         moveX  = 0.06583
         moveY  = -0.31616
         moveZ  = 0.01625
+        #moveZ  = 0.065
         moveRx = 2.191
         moveRy = 2.238
         moveRz = 0
@@ -98,6 +88,7 @@ def robot_home() :
         r.send(cmd_move)
         time.sleep(1)
 
+# gg_robot.py
 def gripper_move(x,y,rz, mode=0):
         
         global moveX, moveY, moveZ, moveRx, moveRy, moveRz
@@ -112,9 +103,10 @@ def gripper_move(x,y,rz, mode=0):
 
         #Camera offset
         cameraY=(y*0.79-20.54)/1000 #mm
-        cameraX=(x*0.8936-11.6168)/1000 #mm
+        cameraX=(x*0.8936-85)/1000 #mm
+        #11.6168
 
-        #Robot offsets
+        #Offsets
         offsetZ= - 0.250
         offsetX= 0.250
         if mode == 0:
@@ -126,14 +118,14 @@ def gripper_move(x,y,rz, mode=0):
                moveX = offsetX+cameraX
                moveY+=cameraY
         elif mode == 2:
-               moveZ = offsetZ
+               moveZ = 0.01625
 
         cmd_move = str.encode('movel(p['+str(moveX)+','+str(moveY)+','+str(moveZ)+','+str(moveRx)+','+str(moveRy)+','+str(moveRz)+'],0.5,0.5,0,0)\n')
         r.send(cmd_move)
         time.sleep(1)
         return
  
-
+# main.py
 def vs_recv():
 
         detect_status=0
@@ -147,16 +139,23 @@ def vs_recv():
               
         
         while  v_coor == [0,0,0,0,0] :
+                print("Is error here1")
                 while v_data == '':
                         v.send (b'start!')
-                        v_data = v.recv(64)
+                        print("Is error here2")
+                        v_data = v.recv(256)
+                        print("Is error here")
                
                 coor_str = str(v_data, 'UTF-8')
+                print(coor_str)
                 a = coor_str.split("[")
+                print("a is ", a)
                 b = a[1].split("]")
                 coor_int = (b[0].split(","))
-                detect_status=int(coor_int[0])
+                detect_status=int(coor_int[5])
                 angle_status=int(coor_int[1])
+                print("Coordinate")
+                print(coor_int)
                 if(detect_status==1):
                         v_x    = float(coor_int[3])
                         offset = float(coor_int[2])
@@ -170,10 +169,12 @@ def vs_recv():
 
         return v_coor
 
+# main.py
 def conveyor_task():
     conveyor = Conveyor()
     conveyor.conveyor_control()
 
+# main.py
 def Initialize():
         robot_connection()
         gripper_connection()
@@ -184,7 +185,9 @@ def Initialize():
         # Start conveyor as a thread
         conveyor_thread = threading.Thread(target=conveyor_task)
         conveyor_thread.start()
+        grip_control(0)
 
+# main.py
 def activating():
         while True:
                 v_x = 0
@@ -192,7 +195,7 @@ def activating():
                 v_rz = 0  
                 status_detect=0
                 status_angle=0 
-                delay = 0.5  
+                delay = 0.3  
 
                 time.sleep(delay)
                 print("Waiting for object detection")
@@ -206,14 +209,16 @@ def activating():
                 gripper_move(x=v_x, y=v_y, rz=0, mode=1) # Move gripper down
                 time.sleep(delay)
                 grip_control(255)
-                time.sleep(delay)
-                robot_home()
+                # time.sleep(delay)
+                # robot_home()
                 time.sleep(delay)
                 gripper_move(x=v_x, y=v_y, rz=0, mode=2)
-                time.sleep(delay)
-                grip_control(0)
-                time.sleep(delay)
-                robot_home()
+                # time.sleep(delay)
+                # grip_control(0)
+                # #time.sleep(delay)
+                # #robot_home()
+
+                status_detect,status_angle,v_x, v_y, v_rz = vs_recv()               
 
               
 def main():
@@ -226,4 +231,3 @@ def main():
 if __name__ == '__main__':
     import sys
     main()
-
