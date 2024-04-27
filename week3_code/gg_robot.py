@@ -18,22 +18,20 @@ class Robot:
             print('Connected to Robot RTDE...FAILED!')
     
     def move(self, x, y, rz, mode=0):
-        moveX=.046
-        moveY=-.32
-        moveZ=.05
-        moveRx=2.2
-        moveRy=2.24
-        moveRz=0
+        moveX  = 0.06583
+        moveY  = -0.31616
+        moveZ  = 0.01625
+        moveRx = 2.191
+        moveRy = 2.238
+        moveRz = 0
 
         #Camera offset
         cameraY=(y*0.79-20.54)/1000 #mm
-        cameraX=(x*0.8936-90)/1000 #mm
+        cameraX=(x*0.8936-11.6168)/1000 #mm
 
         #Robot offsets
         offsetZ= - 0.250
         offsetX= 0.250
-
-        vel=0.5
         if mode == 0:
                moveZ = offsetZ+0.066
                moveX = offsetX+cameraX
@@ -43,27 +41,24 @@ class Robot:
                moveX = offsetX+cameraX
                moveY+=cameraY
         elif mode == 2:
-               moveZ = moveZ
-               moveX = offsetX+cameraX
-               moveY+=cameraY
-               vel=0.4
+               moveZ = 0.01625
 
-        cmd_move = str.encode('movel(p['+str(moveX)+','+str(moveY)+','+str(moveZ)+','+str(moveRx)+','+str(moveRy)+','+str(moveRz)+'],0.5,{},0,0)\n'.format(vel))
+        cmd_move = str.encode('movel(p['+str(moveX)+','+str(moveY)+','+str(moveZ)+','+str(moveRx)+','+str(moveRy)+','+str(moveRz)+'],0.5,0.5,0,0)\n')
         self.r.send(cmd_move)
-        time.sleep(1.6)
+        time.sleep(1)
 
     def home(self):
         print('Robot start moving')
-        moveX=.046
-        moveY=-.32
-        moveZ=.05
-        moveRx=2.2
-        moveRy=2.24
-        moveRz=0
+        moveX  = 0.06583
+        moveY  = -0.31616
+        moveZ  = 0.01625
+        moveRx = 2.191
+        moveRy = 2.238
+        moveRz = 0
 
         cmd_move = str.encode('movel(p['+str(moveX)+','+str(moveY)+','+str(moveZ)+','+str(moveRx)+','+str(moveRy)+','+str(moveRz)+'],0.5,0.5,0,0)\n')
-        #r.send(b'movel(p[0.2,-0.35,0.1,2.253,-2.271,0],0.5,0.25,0,0)\n')
-        print (cmd_move)
+
+        print(cmd_move)
         self.r.send(cmd_move)
         time.sleep(1)
 
