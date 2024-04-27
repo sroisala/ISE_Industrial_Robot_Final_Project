@@ -1,4 +1,4 @@
-# Catch a Box with UR3 Robot
+# Pick a Box with UR3 Robot
 
 This repository contains the code and documentation for a project in **2147308 Industrial Robot**, a course offered by the Robotics and Artificial Intelligence Engineering program at the International School of Engineering, Chulalongkorn University. The project involves programming a UR3 robot to grab a box from a conveyor belt using computer vision and a gripper.
 
